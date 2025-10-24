@@ -1,0 +1,352 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum user_role {
+  CUSTOMER
+  ORGANIZER
+}
+
+enum txn_status {
+  WAITING_PAYMENT
+  WAITING_CONFIRMATION
+  DONE
+  REJECTED
+  EXPIRED
+  CANCELED
+}
+
+enum discount_type {
+  PERCENT
+  FIXED
+}
+
+enum ticket_status {
+  VALID
+  CHECKED_IN
+  REFUNDED
+  VOID
+}
+
+// =========================================
+// MODELS
+// =========================================
+
+model users {
+  id             BigInt @id @default(autoincrement())
+  email          String @unique
+  password       String
+  full_name      String
+  phone_number   String
+  referral_code  String @unique
+  referred_by_id BigInt
+
+  role user_role @default(CUSTOMER)
+
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  // Relations
+  referred_by               users?                @relation("UserReferrals", fields: [referred_by_id], references: [id])
+  referrals                 users[]               @relation("UserReferrals")
+  profile                   user_profiles?
+  organizer                 organizers?
+  transactions              transactions[]
+  coupon_issuance           coupon_issuances[]
+  point_ledgers             point_ledger[]
+  reviews                   reviews[]
+  checkins                  checkins[]
+  email_notifications       email_notifications[]
+  referral_uses_as_referrer referral_uses[]       @relation("Referrer")
+  referral_uses_as_referee  referral_uses?        @relation("Referee")
+
+  @@map("users")
+}
+
+model user_profiles {
+  user_id          BigInt    @id
+  display_name     String?
+  avatar_url       String?
+  bio              String?
+  reset_token_hash String?
+  reset_token_exp  DateTime?
+  updated_at       DateTime?
+
+  user users @relation(fields: [user_id], references: [id])
+
+  @@map("user_profiles")
+}
+
+model organizers {
+  id          BigInt    @id @default(autoincrement())
+  user_id     BigInt    @unique
+  brand_name  String?
+  description String?
+  website     String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime?
+
+  user         users          @relation(fields: [user_id], references: [id])
+  events       events[]
+  vouchers     vouchers[]
+  transactions transactions[]
+
+  @@map("organizers")
+}
+
+model categories {
+  id     BigInt   @id @default(autoincrement())
+  name   String   @unique
+  events events[]
+
+  @@map("categories")
+}
+
+model events {
+  id              BigInt    @id @default(autoincrement())
+  organizer_id    BigInt
+  title           String
+  description     String?
+  category_id     BigInt?
+  address         String?
+  city            String?
+  province        String?
+  country         String?
+  start_time      DateTime
+  end_time        DateTime?
+  capacity        Int
+  seats_available Int
+  is_published    Boolean   @default(false)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime?
+
+  organizer         organizers          @relation(fields: [organizer_id], references: [id])
+  category          categories?         @relation(fields: [category_id], references: [id])
+  ticket_types      ticket_types[]
+  vouchers          vouchers[]
+  transaction_items transaction_items[]
+  tickets           tickets[]
+  reviews           reviews[]
+
+  @@map("events")
+}
+
+model ticket_types {
+  id         BigInt    @id @default(autoincrement())
+  event_id   BigInt
+  name       String
+  price_idr  Decimal   @default(0)
+  quota      Int?
+  sale_start DateTime?
+  sale_end   DateTime?
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+
+  event             events              @relation(fields: [event_id], references: [id])
+  transaction_items transaction_items[]
+  tickets           tickets[]
+
+  @@map("ticket_types")
+}
+
+model vouchers {
+  id           BigInt        @id @default(autoincrement())
+  organizer_id BigInt
+  event_id     BigInt
+  code         String        @unique
+  type         discount_type
+  value        Decimal
+  max_uses     Int?
+  used_count   Int           @default(0)
+  starts_at    DateTime?
+  ends_at      DateTime?
+  is_active    Boolean       @default(true)
+  created_at   DateTime      @default(now())
+
+  organizer    organizers     @relation(fields: [organizer_id], references: [id])
+  event        events         @relation(fields: [event_id], references: [id])
+  transactions transactions[]
+
+  @@map("vouchers")
+}
+
+model coupons {
+  id         BigInt        @id @default(autoincrement())
+  code       String        @unique
+  type       discount_type
+  value      Decimal
+  is_active  Boolean       @default(true)
+  created_at DateTime      @default(now())
+
+  issuances coupon_issuances[]
+
+  @@map("coupons")
+}
+
+model coupon_issuances {
+  id         BigInt    @id @default(autoincrement())
+  coupon_id  BigInt
+  user_id    BigInt
+  issued_at  DateTime  @default(now())
+  expires_at DateTime
+  used_at    DateTime?
+  status     String    @default("unused")
+
+  coupon       coupons        @relation(fields: [coupon_id], references: [id])
+  user         users          @relation(fields: [user_id], references: [id])
+  transactions transactions[]
+
+  @@map("coupon_issuances")
+}
+
+model referral_uses {
+  id          BigInt   @id @default(autoincrement())
+  referrer_id BigInt
+  referee_id  BigInt   @unique
+  referred_at DateTime @default(now())
+
+  referrer users @relation("Referrer", fields: [referrer_id], references: [id])
+  referee  users @relation("Referee", fields: [referee_id], references: [id])
+
+  @@map("referral_uses")
+}
+
+model point_ledger {
+  id             BigInt    @id @default(autoincrement())
+  user_id        BigInt
+  points         Int
+  reason         String?
+  related_txn_id BigInt?
+  granted_at     DateTime  @default(now())
+  expires_at     DateTime?
+  consumed_at    DateTime?
+  note           String?
+
+  user users @relation(fields: [user_id], references: [id])
+
+  @@map("point_ledger")
+}
+
+model transactions {
+  id                 BigInt     @id @default(autoincrement())
+  user_id            BigInt
+  organizer_id       BigInt
+  status             txn_status @default(WAITING_PAYMENT)
+  subtotal_idr       Decimal    @default(0)
+  discount_voucher   Decimal    @default(0)
+  discount_coupon    Decimal    @default(0)
+  discount_points    Decimal    @default(0)
+  fees_idr           Decimal    @default(0)
+  total_idr          Decimal    @default(0)
+  voucher_id         BigInt?
+  coupon_issuance_id BigInt?
+  points_debited     Int        @default(0)
+  payment_proof_url  String?
+  proof_uploaded_at  DateTime?
+  proof_due_at       DateTime?
+  confirm_due_at     DateTime?
+  created_at         DateTime   @default(now())
+  updated_at         DateTime?
+
+  user                users                 @relation(fields: [user_id], references: [id])
+  organizer           organizers            @relation(fields: [organizer_id], references: [id])
+  voucher             vouchers?             @relation(fields: [voucher_id], references: [id])
+  coupon_issuance     coupon_issuances?     @relation(fields: [coupon_issuance_id], references: [id])
+  transaction_items   transaction_items[]
+  email_notifications email_notifications[]
+
+  @@map("transactions")
+}
+
+model transaction_items {
+  id             BigInt  @id @default(autoincrement())
+  transaction_id BigInt
+  event_id       BigInt
+  ticket_type_id BigInt
+  quantity       Int     @default(1)
+  unit_price_idr Decimal
+  line_total_idr Decimal
+
+  transaction transactions @relation(fields: [transaction_id], references: [id])
+  event       events       @relation(fields: [event_id], references: [id])
+  ticket_type ticket_types @relation(fields: [ticket_type_id], references: [id])
+  tickets     tickets[]
+
+  @@map("transaction_items")
+}
+
+model tickets {
+  id                  BigInt        @id @default(autoincrement())
+  transaction_item_id BigInt
+  event_id            BigInt
+  ticket_type_id      BigInt
+  ticket_code         String        @unique
+  status              ticket_status @default(VALID)
+  issued_at           DateTime      @default(now())
+  checked_in_at       DateTime?
+
+  transaction_item transaction_items @relation(fields: [transaction_item_id], references: [id])
+  event            events            @relation(fields: [event_id], references: [id])
+  ticket_type      ticket_types      @relation(fields: [ticket_type_id], references: [id])
+  review           reviews[]
+  checkin          checkins?
+
+  @@map("tickets")
+}
+
+model checkins {
+  id              BigInt   @id @default(autoincrement())
+  ticket_id       BigInt   @unique
+  gate            String?
+  scanned_by_user BigInt?
+  scanned_at      DateTime @default(now())
+
+  ticket tickets @relation(fields: [ticket_id], references: [id])
+  user   users?  @relation(fields: [scanned_by_user], references: [id])
+
+  @@map("checkins")
+}
+
+model reviews {
+  id          BigInt   @id @default(autoincrement())
+  event_id    BigInt
+  reviewer_id BigInt
+  ticket_id   BigInt?
+  rating      Int
+  comment     String?
+  created_at  DateTime @default(now())
+
+  event    events   @relation(fields: [event_id], references: [id])
+  reviewer users    @relation(fields: [reviewer_id], references: [id])
+  ticket   tickets? @relation(fields: [ticket_id], references: [id])
+
+  @@map("reviews")
+}
+
+model email_notifications {
+  id             BigInt   @id @default(autoincrement())
+  user_id        BigInt
+  transaction_id BigInt?
+  type           String
+  sent_at        DateTime @default(now())
+  payload        String?
+
+  user        users         @relation(fields: [user_id], references: [id])
+  transaction transactions? @relation(fields: [transaction_id], references: [id])
+
+  @@map("email_notifications")
+}
