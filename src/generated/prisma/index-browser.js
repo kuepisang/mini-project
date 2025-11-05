@@ -129,6 +129,7 @@ exports.Prisma.UsersScalarFieldEnum = {
   referral_code: 'referral_code',
   referred_by_id: 'referred_by_id',
   role: 'role',
+  refresh_token_version: 'refresh_token_version',
   is_active: 'is_active',
   created_at: 'created_at',
   updated_at: 'updated_at',
@@ -142,7 +143,9 @@ exports.Prisma.User_profilesScalarFieldEnum = {
   bio: 'bio',
   reset_token_hash: 'reset_token_hash',
   reset_token_exp: 'reset_token_exp',
-  updated_at: 'updated_at'
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
 };
 
 exports.Prisma.OrganizersScalarFieldEnum = {
@@ -152,7 +155,8 @@ exports.Prisma.OrganizersScalarFieldEnum = {
   description: 'description',
   website: 'website',
   created_at: 'created_at',
-  updated_at: 'updated_at'
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
 };
 
 exports.Prisma.CategoriesScalarFieldEnum = {
@@ -176,7 +180,8 @@ exports.Prisma.EventsScalarFieldEnum = {
   seats_available: 'seats_available',
   is_published: 'is_published',
   created_at: 'created_at',
-  updated_at: 'updated_at'
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
 };
 
 exports.Prisma.Ticket_typesScalarFieldEnum = {
@@ -188,7 +193,9 @@ exports.Prisma.Ticket_typesScalarFieldEnum = {
   sale_start: 'sale_start',
   sale_end: 'sale_end',
   is_active: 'is_active',
-  created_at: 'created_at'
+  created_at: 'created_at',
+  update_at: 'update_at',
+  deleted_at: 'deleted_at'
 };
 
 exports.Prisma.VouchersScalarFieldEnum = {
@@ -203,7 +210,9 @@ exports.Prisma.VouchersScalarFieldEnum = {
   starts_at: 'starts_at',
   ends_at: 'ends_at',
   is_active: 'is_active',
-  created_at: 'created_at'
+  created_at: 'created_at',
+  update_at: 'update_at',
+  deleted_at: 'deleted_at'
 };
 
 exports.Prisma.CouponsScalarFieldEnum = {
@@ -212,7 +221,9 @@ exports.Prisma.CouponsScalarFieldEnum = {
   type: 'type',
   value: 'value',
   is_active: 'is_active',
-  created_at: 'created_at'
+  created_at: 'created_at',
+  update_at: 'update_at',
+  deleted_at: 'deleted_at'
 };
 
 exports.Prisma.Coupon_issuancesScalarFieldEnum = {
@@ -263,7 +274,8 @@ exports.Prisma.TransactionsScalarFieldEnum = {
   proof_due_at: 'proof_due_at',
   confirm_due_at: 'confirm_due_at',
   created_at: 'created_at',
-  updated_at: 'updated_at'
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
 };
 
 exports.Prisma.Transaction_itemsScalarFieldEnum = {

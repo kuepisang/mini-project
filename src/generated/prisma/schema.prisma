@@ -10,8 +10,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum user_role {
@@ -45,15 +46,16 @@ enum ticket_status {
 // =========================================
 
 model users {
-  id             BigInt @id @default(autoincrement())
-  email          String @unique
+  id             String  @id @default(uuid())
+  email          String  @unique @db.VarChar(100)
   password       String
-  full_name      String
-  phone_number   String
-  referral_code  String @unique
-  referred_by_id BigInt
+  full_name      String  @db.VarChar(50)
+  phone_number   String  @db.VarChar(15)
+  referral_code  String  @unique
+  referred_by_id String?
 
-  role user_role @default(CUSTOMER)
+  role                  user_role @default(CUSTOMER)
+  refresh_token_version Int       @default(0)
 
   is_active  Boolean   @default(true)
   created_at DateTime  @default(now())
@@ -78,13 +80,16 @@ model users {
 }
 
 model user_profiles {
-  user_id          BigInt    @id
-  display_name     String?
+  user_id          String    @id
+  display_name     String    @db.VarChar(50)
   avatar_url       String?
-  bio              String?
+  bio              String?   @db.VarChar(50)
   reset_token_hash String?
   reset_token_exp  DateTime?
-  updated_at       DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   user users @relation(fields: [user_id], references: [id])
 
@@ -92,13 +97,15 @@ model user_profiles {
 }
 
 model organizers {
-  id          BigInt    @id @default(autoincrement())
-  user_id     BigInt    @unique
-  brand_name  String?
-  description String?
+  id          String  @id @default(uuid())
+  user_id     String  @unique
+  brand_name  String? @db.VarChar(50)
+  description String? @db.VarChar(300)
   website     String?
-  created_at  DateTime  @default(now())
-  updated_at  DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   user         users          @relation(fields: [user_id], references: [id])
   events       events[]
@@ -109,33 +116,35 @@ model organizers {
 }
 
 model categories {
-  id     BigInt   @id @default(autoincrement())
-  name   String   @unique
+  id     String   @id @default(uuid())
+  name   String   @db.VarChar(50)
   events events[]
 
   @@map("categories")
 }
 
 model events {
-  id              BigInt    @id @default(autoincrement())
-  organizer_id    BigInt
+  id              String   @id @default(uuid())
+  organizer_id    String
   title           String
-  description     String?
-  category_id     BigInt?
-  address         String?
-  city            String?
-  province        String?
-  country         String?
+  description     String
+  category_id     String
+  address         String
+  city            String
+  province        String
+  country         String
   start_time      DateTime
-  end_time        DateTime?
+  end_time        DateTime
   capacity        Int
   seats_available Int
-  is_published    Boolean   @default(false)
-  created_at      DateTime  @default(now())
-  updated_at      DateTime?
+  is_published    Boolean  @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime
+  deleted_at DateTime?
 
   organizer         organizers          @relation(fields: [organizer_id], references: [id])
-  category          categories?         @relation(fields: [category_id], references: [id])
+  category          categories          @relation(fields: [category_id], references: [id])
   ticket_types      ticket_types[]
   vouchers          vouchers[]
   transaction_items transaction_items[]
@@ -146,15 +155,18 @@ model events {
 }
 
 model ticket_types {
-  id         BigInt    @id @default(autoincrement())
-  event_id   BigInt
+  id         String   @id @default(uuid())
+  event_id   String
   name       String
-  price_idr  Decimal   @default(0)
-  quota      Int?
-  sale_start DateTime?
-  sale_end   DateTime?
-  is_active  Boolean   @default(true)
+  price_idr  Decimal  @default(0)
+  quota      Int
+  sale_start DateTime
+  sale_end   DateTime
+  is_active  Boolean  @default(true)
+
   created_at DateTime  @default(now())
+  update_at  DateTime  @updatedAt()
+  deleted_at DateTime?
 
   event             events              @relation(fields: [event_id], references: [id])
   transaction_items transaction_items[]
@@ -164,18 +176,21 @@ model ticket_types {
 }
 
 model vouchers {
-  id           BigInt        @id @default(autoincrement())
-  organizer_id BigInt
-  event_id     BigInt
+  id           String        @id @default(uuid())
+  organizer_id String
+  event_id     String
   code         String        @unique
   type         discount_type
   value        Decimal
-  max_uses     Int?
+  max_uses     Int
   used_count   Int           @default(0)
-  starts_at    DateTime?
-  ends_at      DateTime?
+  starts_at    DateTime
+  ends_at      DateTime
   is_active    Boolean       @default(true)
-  created_at   DateTime      @default(now())
+
+  created_at DateTime  @default(now())
+  update_at  DateTime  @updatedAt
+  deleted_at DateTime?
 
   organizer    organizers     @relation(fields: [organizer_id], references: [id])
   event        events         @relation(fields: [event_id], references: [id])
@@ -185,12 +200,15 @@ model vouchers {
 }
 
 model coupons {
-  id         BigInt        @id @default(autoincrement())
-  code       String        @unique
-  type       discount_type
-  value      Decimal
-  is_active  Boolean       @default(true)
-  created_at DateTime      @default(now())
+  id        String        @id @default(uuid())
+  code      String        @unique
+  type      discount_type
+  value     Decimal
+  is_active Boolean       @default(true)
+
+  created_at DateTime  @default(now())
+  update_at  DateTime  @updatedAt
+  deleted_at DateTime?
 
   issuances coupon_issuances[]
 
@@ -198,9 +216,9 @@ model coupons {
 }
 
 model coupon_issuances {
-  id         BigInt    @id @default(autoincrement())
-  coupon_id  BigInt
-  user_id    BigInt
+  id         String    @id @default(uuid())
+  coupon_id  String
+  user_id    String
   issued_at  DateTime  @default(now())
   expires_at DateTime
   used_at    DateTime?
@@ -214,9 +232,9 @@ model coupon_issuances {
 }
 
 model referral_uses {
-  id          BigInt   @id @default(autoincrement())
-  referrer_id BigInt
-  referee_id  BigInt   @unique
+  id          String   @id @default(uuid())
+  referrer_id String
+  referee_id  String   @unique
   referred_at DateTime @default(now())
 
   referrer users @relation("Referrer", fields: [referrer_id], references: [id])
@@ -226,13 +244,13 @@ model referral_uses {
 }
 
 model point_ledger {
-  id             BigInt    @id @default(autoincrement())
-  user_id        BigInt
+  id             String    @id @default(uuid())
+  user_id        String
   points         Int
-  reason         String?
-  related_txn_id BigInt?
+  reason         String
+  related_txn_id String?
   granted_at     DateTime  @default(now())
-  expires_at     DateTime?
+  expires_at     DateTime
   consumed_at    DateTime?
   note           String?
 
@@ -242,9 +260,9 @@ model point_ledger {
 }
 
 model transactions {
-  id                 BigInt     @id @default(autoincrement())
-  user_id            BigInt
-  organizer_id       BigInt
+  id                 String     @id @default(uuid())
+  user_id            String
+  organizer_id       String
   status             txn_status @default(WAITING_PAYMENT)
   subtotal_idr       Decimal    @default(0)
   discount_voucher   Decimal    @default(0)
@@ -252,20 +270,22 @@ model transactions {
   discount_points    Decimal    @default(0)
   fees_idr           Decimal    @default(0)
   total_idr          Decimal    @default(0)
-  voucher_id         BigInt?
-  coupon_issuance_id BigInt?
+  voucher_id         String
+  coupon_issuance_id String
   points_debited     Int        @default(0)
-  payment_proof_url  String?
-  proof_uploaded_at  DateTime?
-  proof_due_at       DateTime?
-  confirm_due_at     DateTime?
-  created_at         DateTime   @default(now())
-  updated_at         DateTime?
+  payment_proof_url  String
+  proof_uploaded_at  DateTime
+  proof_due_at       DateTime
+  confirm_due_at     DateTime
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   user                users                 @relation(fields: [user_id], references: [id])
   organizer           organizers            @relation(fields: [organizer_id], references: [id])
-  voucher             vouchers?             @relation(fields: [voucher_id], references: [id])
-  coupon_issuance     coupon_issuances?     @relation(fields: [coupon_issuance_id], references: [id])
+  voucher             vouchers              @relation(fields: [voucher_id], references: [id])
+  coupon_issuance     coupon_issuances      @relation(fields: [coupon_issuance_id], references: [id])
   transaction_items   transaction_items[]
   email_notifications email_notifications[]
 
@@ -273,10 +293,10 @@ model transactions {
 }
 
 model transaction_items {
-  id             BigInt  @id @default(autoincrement())
-  transaction_id BigInt
-  event_id       BigInt
-  ticket_type_id BigInt
+  id             String  @id @default(uuid())
+  transaction_id String
+  event_id       String
+  ticket_type_id String
   quantity       Int     @default(1)
   unit_price_idr Decimal
   line_total_idr Decimal
@@ -290,14 +310,14 @@ model transaction_items {
 }
 
 model tickets {
-  id                  BigInt        @id @default(autoincrement())
-  transaction_item_id BigInt
-  event_id            BigInt
-  ticket_type_id      BigInt
+  id                  String        @id @default(uuid())
+  transaction_item_id String
+  event_id            String
+  ticket_type_id      String
   ticket_code         String        @unique
   status              ticket_status @default(VALID)
   issued_at           DateTime      @default(now())
-  checked_in_at       DateTime?
+  checked_in_at       DateTime
 
   transaction_item transaction_items @relation(fields: [transaction_item_id], references: [id])
   event            events            @relation(fields: [event_id], references: [id])
@@ -309,10 +329,10 @@ model tickets {
 }
 
 model checkins {
-  id              BigInt   @id @default(autoincrement())
-  ticket_id       BigInt   @unique
-  gate            String?
-  scanned_by_user BigInt?
+  id              String   @id @default(uuid())
+  ticket_id       String   @unique
+  gate            String
+  scanned_by_user String
   scanned_at      DateTime @default(now())
 
   ticket tickets @relation(fields: [ticket_id], references: [id])
@@ -322,13 +342,14 @@ model checkins {
 }
 
 model reviews {
-  id          BigInt   @id @default(autoincrement())
-  event_id    BigInt
-  reviewer_id BigInt
-  ticket_id   BigInt?
+  id          String @id @default(uuid())
+  event_id    String
+  reviewer_id String
+  ticket_id   String
   rating      Int
-  comment     String?
-  created_at  DateTime @default(now())
+  comment     String
+
+  created_at DateTime @default(now())
 
   event    events   @relation(fields: [event_id], references: [id])
   reviewer users    @relation(fields: [reviewer_id], references: [id])
@@ -338,12 +359,12 @@ model reviews {
 }
 
 model email_notifications {
-  id             BigInt   @id @default(autoincrement())
-  user_id        BigInt
-  transaction_id BigInt?
+  id             String   @id @default(uuid())
+  user_id        String
+  transaction_id String
   type           String
   sent_at        DateTime @default(now())
-  payload        String?
+  payload        String
 
   user        users         @relation(fields: [user_id], references: [id])
   transaction transactions? @relation(fields: [transaction_id], references: [id])
